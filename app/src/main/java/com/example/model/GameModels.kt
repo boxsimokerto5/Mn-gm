@@ -19,7 +19,9 @@ data class GameItem(
     val isFeatured: Boolean = false,
     val gameType: GameType,
     val webUrl: String? = null,
-    val thumbnailUrl: String? = null
+    val thumbnailUrl: String? = null,
+    val rawMiniGameId: String? = null,
+    val isOfficialSlot: Boolean = false
 )
 
 data class WalletState(

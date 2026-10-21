@@ -53,15 +53,28 @@ import com.example.ui.theme.SunGoldDark
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.scale
+
 @Composable
 fun CoinBadge(
     coins: Int,
     modifier: Modifier = Modifier
 ) {
+    val scale = remember { Animatable(1f) }
+    LaunchedEffect(coins) {
+        scale.animateTo(1.15f, animationSpec = tween(90))
+        scale.animateTo(1.0f, animationSpec = tween(140))
+    }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .testTag("coin_balance_badge")
+            .scale(scale.value)
             .shadow(4.dp, RoundedCornerShape(20.dp))
             .background(
                 brush = Brush.horizontalGradient(

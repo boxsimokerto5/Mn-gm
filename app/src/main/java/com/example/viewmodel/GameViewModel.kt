@@ -55,27 +55,94 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val quests: StateFlow<List<DailyQuest>> = _quests.asStateFlow()
 
     private val apiService = com.example.data.MiniGameApiService()
+    private val miniGameAiService = com.example.data.MiniGameAiService()
+
+    private val _slotGames = MutableStateFlow<List<GameItem>>(emptyList())
+    val slotGames: StateFlow<List<GameItem>> = _slotGames.asStateFlow()
+
     private val _gamesList = MutableStateFlow<List<GameItem>>(GameCatalog.games)
     val gamesList: StateFlow<List<GameItem>> = _gamesList.asStateFlow()
 
     private val _isLoadingGames = MutableStateFlow(false)
     val isLoadingGames: StateFlow<Boolean> = _isLoadingGames.asStateFlow()
 
+    private val _recentGames = MutableStateFlow<List<GameItem>>(emptyList())
+    val recentGames: StateFlow<List<GameItem>> = _recentGames.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
     private var timerJob: Job? = null
 
     init {
         refreshQuests()
+        refreshRecentGames()
         fetchGamesFromApi()
+    }
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    private fun refreshRecentGames() {
+        val recentIds = prefs.getRecentGameIds()
+        val all = _gamesList.value
+        val map = all.associateBy { it.id }
+        val list = recentIds.mapNotNull { map[it] }
+        _recentGames.value = list
     }
 
     fun fetchGamesFromApi() {
         viewModelScope.launch {
             _isLoadingGames.value = true
-            val online = apiService.fetchOnlineGames()
-            if (online.isNotEmpty()) {
-                _gamesList.value = GameCatalog.games + online
+
+            // 1. Fetch official slot items from MiniGame.ai OpenAPI v4 (bigCard slot)
+            val slotItems = miniGameAiService.fetchSlot()
+            val slotGameItems = slotItems.map { slot ->
+                GameItem(
+                    id = "minigame_slot_${slot.id}",
+                    title = slot.title,
+                    category = "MiniGame.ai Resmi",
+                    description = slot.description,
+                    emoji = "⭐",
+                    bannerColor = 0xFFFF8F00,
+                    coinsPerMinute = 20,
+                    isFeatured = true,
+                    gameType = com.example.model.GameType.WEB_GAME,
+                    webUrl = slot.link,
+                    thumbnailUrl = slot.iconUrl ?: slot.bannerUrl,
+                    rawMiniGameId = slot.id,
+                    isOfficialSlot = true
+                )
             }
+
+            if (slotGameItems.isNotEmpty()) {
+                _slotGames.value = slotGameItems
+                // Report "show" event (OpenAPI v4 §5)
+                slotGameItems.forEach { g ->
+                    g.rawMiniGameId?.let { contentId ->
+                        miniGameAiService.reportEvent("show", contentId)
+                    }
+                }
+            }
+
+            // Combine only official MiniGame slot items and MiniGame catalog
+            val combined = (slotGameItems + GameCatalog.games).distinctBy { it.id }
+            _gamesList.value = combined
+            refreshRecentGames()
             _isLoadingGames.value = false
+        }
+    }
+
+    fun reportSlotClick(contentId: String) {
+        viewModelScope.launch {
+            miniGameAiService.reportEvent("click", contentId)
+        }
+    }
+
+    fun reportSlotShow(contentId: String) {
+        viewModelScope.launch {
+            miniGameAiService.reportEvent("show", contentId)
         }
     }
 
@@ -91,6 +158,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _activeGame.value = game
         _sessionSeconds.value = 0
         _sessionEarnedCoins.value = 0
+
+        // Track recently played game so users can find it again with title
+        prefs.addRecentGameId(game.id)
+        refreshRecentGames()
+
+        // Report "click" event if this is a MiniGame.ai slot game (OpenAPI v4 §5)
+        game.rawMiniGameId?.let { contentId ->
+            reportSlotClick(contentId)
+        }
+
         startPlaytimeTracker(game)
     }
 

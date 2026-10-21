@@ -79,6 +79,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            val processName = android.app.Application.getProcessName()
+            if (packageName != processName) {
+                try {
+                    android.webkit.WebView.setDataDirectorySuffix(processName)
+                } catch (_: Exception) {}
+            }
+        }
+
         setContent {
             MyApplicationTheme {
                 MainAppContent(viewModel = viewModel)

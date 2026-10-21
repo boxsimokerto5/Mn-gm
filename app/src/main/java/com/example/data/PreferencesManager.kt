@@ -23,6 +23,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_CLAIMED_QUESTS = "claimed_quests"
         private const val KEY_TRANSACTIONS = "transactions_json"
         private const val KEY_CUSTOM_GAME_URL = "custom_game_url"
+        private const val KEY_RECENT_GAMES = "recent_game_ids"
     }
 
     private fun getTodayDateString(): String {
@@ -129,4 +130,26 @@ class PreferencesManager(context: Context) {
     var customGameUrl: String
         get() = prefs.getString(KEY_CUSTOM_GAME_URL, "") ?: ""
         set(value) = prefs.edit().putString(KEY_CUSTOM_GAME_URL, value).apply()
+
+    fun getRecentGameIds(): List<String> {
+        val jsonStr = prefs.getString(KEY_RECENT_GAMES, null) ?: return emptyList()
+        val list = mutableListOf<String>()
+        try {
+            val array = JSONArray(jsonStr)
+            for (i in 0 until array.length()) {
+                list.add(array.getString(i))
+            }
+        } catch (_: Exception) {}
+        return list
+    }
+
+    fun addRecentGameId(gameId: String) {
+        val current = getRecentGameIds().toMutableList()
+        current.remove(gameId)
+        current.add(0, gameId)
+        val trimmed = current.take(15)
+        val array = JSONArray()
+        trimmed.forEach { array.put(it) }
+        prefs.edit().putString(KEY_RECENT_GAMES, array.toString()).apply()
+    }
 }

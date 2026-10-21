@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -73,7 +74,7 @@ import com.example.data.HtmlGames
 import com.example.data.MiniGameConfig
 import com.example.model.GameItem
 import com.example.model.GameType
-import com.example.ui.components.CoinRewardCelebrationDialog
+import com.example.ui.components.FlyingCoinRewardOverlay
 import com.example.ui.components.PlaySessionHeader
 import com.example.ui.theme.CardSurface
 import com.example.ui.theme.CoralCandy
@@ -135,9 +136,9 @@ fun GamePlayScreen(
     }
 
     rewardPopup?.let { amount ->
-        CoinRewardCelebrationDialog(
+        FlyingCoinRewardOverlay(
             amount = amount,
-            onDismiss = { viewModel.dismissRewardPopup() }
+            onAnimationEnd = { viewModel.dismissRewardPopup() }
         )
     }
 }
@@ -594,6 +595,7 @@ fun WebGamePlayer(game: GameItem) {
     var customUrlInput by remember { mutableStateOf("") }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var rendererCrashed by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -616,14 +618,14 @@ fun WebGamePlayer(game: GameItem) {
                         Text(text = "🔑", fontSize = 14.sp)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "API Key: ${apiKey.take(8)}... | ID: ${appId.take(8)}...",
+                            text = if (game.isOfficialSlot) "MiniGame Slot: ${MiniGameConfig.slotId}" else "API Key: ${apiKey.take(8)}... | ID: ${appId.take(8)}...",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = PurpleFun
                         )
                     }
                     Text(
-                        text = "🟢 Server Siap",
+                        text = if (game.isOfficialSlot) "⭐ Slot Resmi" else "🟢 Server Siap",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = LimeFun
@@ -748,46 +750,114 @@ fun WebGamePlayer(game: GameItem) {
 
         // WEBVIEW CONTAINER
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            AndroidView(
-                factory = { ctx ->
-                    WebView(ctx).apply {
-                        settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            databaseEnabled = true
-                            mediaPlaybackRequiresUserGesture = false
-                            useWideViewPort = true
-                            loadWithOverviewMode = true
-                            allowFileAccess = true
-                            allowContentAccess = true
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            if (rendererCrashed) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFEDE7F6))
+                        .padding(24.dp)
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(20.dp)
+                        ) {
+                            Text(text = "🎯", fontSize = 42.sp)
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Koneksi Game Siap Dimuat",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Klik tombol di bawah untuk memuat ulang tampilan game:",
+                                fontSize = 12.sp,
+                                color = TextSecondary,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = {
+                                    rendererCrashed = false
+                                    isLoading = true
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = OceanCyan),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Muat Ulang Game 🔄", fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                                isLoading = true
-                            }
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                isLoading = false
-                            }
-                            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                                isLoading = false
-                            }
-                        }
-                        webChromeClient = WebChromeClient()
-
-                        // Load initial game based on selection
-                        if (game.id == "web_snake") {
-                            loadDataWithBaseURL("https://minigame.api", HtmlGames.getSnakeHtml(appId, apiKey), "text/html", "UTF-8", null)
-                        } else {
-                            loadDataWithBaseURL("https://minigame.api", HtmlGames.getSpaceRunnerHtml(appId, apiKey), "text/html", "UTF-8", null)
-                        }
-                        webViewInstance = this
                     }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+                }
+            } else {
+                AndroidView(
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            settings.apply {
+                                javaScriptEnabled = true
+                                domStorageEnabled = true
+                                mediaPlaybackRequiresUserGesture = false
+                                useWideViewPort = true
+                                loadWithOverviewMode = true
+                                allowFileAccess = true
+                                allowContentAccess = true
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                    mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                }
+                            }
+                            webViewClient = object : WebViewClient() {
+                                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                    isLoading = true
+                                }
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    isLoading = false
+                                }
+                                override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                                    isLoading = false
+                                }
+                                override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                                    try {
+                                        view?.stopLoading()
+                                        view?.destroy()
+                                    } catch (_: Exception) {}
+                                    isLoading = false
+                                    rendererCrashed = true
+                                    return true
+                                }
+                            }
+                            webChromeClient = WebChromeClient()
+
+                            // Load initial game based on selection
+                            if (!game.webUrl.isNullOrBlank()) {
+                                loadUrl(game.webUrl)
+                            } else if (game.id == "web_snake") {
+                                loadDataWithBaseURL("https://minigame.api", HtmlGames.getSnakeHtml(appId, apiKey), "text/html", "UTF-8", null)
+                            } else {
+                                loadDataWithBaseURL("https://minigame.api", HtmlGames.getSpaceRunnerHtml(appId, apiKey), "text/html", "UTF-8", null)
+                            }
+                            webViewInstance = this
+                        }
+                    },
+                    onRelease = { webView ->
+                        try {
+                            webView.stopLoading()
+                            webView.loadUrl("about:blank")
+                            webView.clearHistory()
+                            webView.removeAllViews()
+                            webView.destroy()
+                        } catch (_: Exception) {}
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             if (isLoading) {
                 Box(
