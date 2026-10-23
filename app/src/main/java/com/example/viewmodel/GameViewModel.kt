@@ -45,6 +45,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _coinRewardPopup = MutableStateFlow<Int?>(null)
     val coinRewardPopup: StateFlow<Int?> = _coinRewardPopup.asStateFlow()
 
+    private val _isFullscreen = MutableStateFlow(false)
+    val isFullscreen: StateFlow<Boolean> = _isFullscreen.asStateFlow()
+
+    fun setFullscreen(fullscreen: Boolean) {
+        _isFullscreen.value = fullscreen
+    }
+
+    fun toggleFullscreen() {
+        _isFullscreen.value = !_isFullscreen.value
+    }
+
     private val _transactions = MutableStateFlow(prefs.getTransactions())
     val transactions: StateFlow<List<RedeemTransaction>> = _transactions.asStateFlow()
 

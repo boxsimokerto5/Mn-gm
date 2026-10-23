@@ -1,5 +1,6 @@
 package com.example
 
+import android.app.Activity
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -34,11 +35,16 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -102,6 +108,29 @@ fun MainAppContent(viewModel: GameViewModel) {
     val activeGame by viewModel.activeGame.collectAsState()
     var currentTab by remember { mutableStateOf(MainNavTab.ARCADE) }
 
+    val isFullscreen by viewModel.isFullscreen.collectAsState()
+    val context = LocalContext.current
+    val activity = context as? Activity
+
+    // Immersive Mode: Sembunyikan status bar dan tombol sistem HP saat mode layar penuh aktif
+    DisposableEffect(isFullscreen) {
+        if (activity != null) {
+            val insetsController = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+            if (isFullscreen) {
+                insetsController.hide(WindowInsetsCompat.Type.systemBars())
+                insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                insetsController.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+        onDispose {
+            if (activity != null) {
+                val insetsController = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+                insetsController.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+
     // If game is active, display GamePlayScreen full-screen
     if (activeGame != null) {
         Box(
@@ -116,8 +145,13 @@ fun MainAppContent(viewModel: GameViewModel) {
             )
         }
     } else {
+        // BackHandler: Keluar dari fullscreen jika sedang fullscreen
+        BackHandler(enabled = isFullscreen) {
+            viewModel.setFullscreen(false)
+        }
+
         // BackHandler for secondary tabs
-        BackHandler(enabled = currentTab != MainNavTab.ARCADE) {
+        BackHandler(enabled = !isFullscreen && currentTab != MainNavTab.ARCADE) {
             currentTab = MainNavTab.ARCADE
         }
 
@@ -125,40 +159,42 @@ fun MainAppContent(viewModel: GameViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .background(CreamBackground),
-            contentWindowInsets = WindowInsets.safeDrawing,
+            contentWindowInsets = if (isFullscreen) WindowInsets(0, 0, 0, 0) else WindowInsets.safeDrawing,
             bottomBar = {
-                NavigationBar(
-                    containerColor = CardSurface,
-                    tonalElevation = 8.dp,
-                    windowInsets = WindowInsets.navigationBars,
-                    modifier = Modifier.testTag("bottom_nav_bar")
-                ) {
-                    MainNavTab.values().forEach { tab ->
-                        val isSelected = currentTab == tab
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = { currentTab = tab },
-                            icon = {
-                                Icon(
-                                    imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
-                                    contentDescription = tab.title,
-                                    tint = if (isSelected) Color(0xFFF57F17) else TextSecondary
-                                )
-                            },
-                            label = {
-                                Text(
-                                    text = tab.title,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    fontSize = 11.sp
-                                )
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = Color(0xFFFFF9C4),
-                                selectedTextColor = Color(0xFF3E2723),
-                                unselectedTextColor = TextSecondary
-                            ),
-                            modifier = Modifier.testTag(tab.testTag)
-                        )
+                if (!isFullscreen) {
+                    NavigationBar(
+                        containerColor = CardSurface,
+                        tonalElevation = 8.dp,
+                        windowInsets = WindowInsets.navigationBars,
+                        modifier = Modifier.testTag("bottom_nav_bar")
+                    ) {
+                        MainNavTab.values().forEach { tab ->
+                            val isSelected = currentTab == tab
+                            NavigationBarItem(
+                                selected = isSelected,
+                                onClick = { currentTab = tab },
+                                icon = {
+                                    Icon(
+                                        imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                        contentDescription = tab.title,
+                                        tint = if (isSelected) Color(0xFFF57F17) else TextSecondary
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = tab.title,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 11.sp
+                                    )
+                                },
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = Color(0xFFFFF9C4),
+                                    selectedTextColor = Color(0xFF3E2723),
+                                    unselectedTextColor = TextSecondary
+                                ),
+                                modifier = Modifier.testTag(tab.testTag)
+                            )
+                        }
                     }
                 }
             }

@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.DailyQuest
 import com.example.ui.components.CoinBadge
+import com.example.ui.components.FlyingCoinRewardOverlay
 import com.example.ui.theme.CardSurface
 import com.example.ui.theme.CreamBackground
 import com.example.ui.theme.LimeFun
@@ -61,15 +62,17 @@ fun QuestScreen(
 ) {
     val wallet by viewModel.walletState.collectAsState()
     val quests by viewModel.quests.collectAsState()
+    val rewardPopup by viewModel.coinRewardPopup.collectAsState()
     val isCheckedInToday = viewModel.isTodayCheckedIn()
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(CreamBackground)
-            .testTag("quest_screen"),
-        contentPadding = PaddingValues(bottom = 32.dp)
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(CreamBackground)
+                .testTag("quest_screen"),
+            contentPadding = PaddingValues(bottom = 32.dp)
+        ) {
         // Top Header
         item {
             Row(
@@ -236,6 +239,14 @@ fun QuestScreen(
             )
             Spacer(modifier = Modifier.height(10.dp))
         }
+    }
+
+    rewardPopup?.let { amount ->
+        FlyingCoinRewardOverlay(
+            amount = amount,
+            onAnimationEnd = { viewModel.dismissRewardPopup() }
+        )
+    }
     }
 }
 

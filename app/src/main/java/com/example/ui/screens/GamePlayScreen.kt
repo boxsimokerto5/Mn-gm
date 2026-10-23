@@ -44,6 +44,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -104,6 +105,7 @@ fun GamePlayScreen(
     val sessionSeconds by viewModel.sessionSeconds.collectAsState()
     val sessionCoins by viewModel.sessionEarnedCoins.collectAsState()
     val rewardPopup by viewModel.coinRewardPopup.collectAsState()
+    val wallet by viewModel.walletState.collectAsState()
 
     Column(
         modifier = Modifier
@@ -114,6 +116,7 @@ fun GamePlayScreen(
             gameTitle = game.title,
             sessionSeconds = sessionSeconds,
             sessionEarnedCoins = sessionCoins,
+            walletCoins = wallet.totalCoins,
             onCloseClick = {
                 viewModel.stopGame()
                 onBack()
@@ -801,14 +804,30 @@ fun WebGamePlayer(game: GameItem) {
                 AndroidView(
                     factory = { ctx ->
                         WebView(ctx).apply {
+                            setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                            isFocusable = true
+                            isFocusableInTouchMode = true
+                            isClickable = true
+                            requestFocus()
+                            setOnTouchListener { v, _ ->
+                                v.requestFocus()
+                                false
+                            }
+
                             settings.apply {
                                 javaScriptEnabled = true
                                 domStorageEnabled = true
+                                databaseEnabled = true
                                 mediaPlaybackRequiresUserGesture = false
                                 useWideViewPort = true
                                 loadWithOverviewMode = true
                                 allowFileAccess = true
                                 allowContentAccess = true
+                                javaScriptCanOpenWindowsAutomatically = true
+                                setSupportMultipleWindows(false)
+                                setSupportZoom(false)
+                                builtInZoomControls = false
+                                displayZoomControls = false
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                 }
@@ -819,6 +838,14 @@ fun WebGamePlayer(game: GameItem) {
                                 }
                                 override fun onPageFinished(view: WebView?, url: String?) {
                                     isLoading = false
+                                }
+                                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                    val url = request?.url?.toString() ?: return false
+                                    if (url.startsWith("http://") || url.startsWith("https://")) {
+                                        view?.loadUrl(url)
+                                        return true
+                                    }
+                                    return false
                                 }
                                 override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                                     isLoading = false
@@ -860,22 +887,14 @@ fun WebGamePlayer(game: GameItem) {
             }
 
             if (isLoading) {
-                Box(
-                    contentAlignment = Alignment.Center,
+                LinearProgressIndicator(
+                    color = OceanCyan,
+                    trackColor = Color.Transparent,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.White.copy(alpha = 0.85f))
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = OceanCyan)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Memuat Mini Game...",
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    }
-                }
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .align(Alignment.TopCenter)
+                )
             }
         }
     }

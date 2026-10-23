@@ -54,58 +54,110 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.scale
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 fun CoinBadge(
     coins: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showWalletIcon: Boolean = true
 ) {
     val scale = remember { Animatable(1f) }
+    val glowAlpha = remember { Animatable(0f) }
+    var prevCoins by remember { mutableIntStateOf(coins) }
+
+    // Rolling animated counter for smooth visual feedback on balance updates
+    val animatedCoins by animateIntAsState(
+        targetValue = coins,
+        animationSpec = tween(durationMillis = 550, easing = FastOutSlowInEasing),
+        label = "wallet_counter_roll"
+    )
+
     LaunchedEffect(coins) {
-        scale.animateTo(1.15f, animationSpec = tween(90))
-        scale.animateTo(1.0f, animationSpec = tween(140))
+        if (coins > prevCoins) {
+            coroutineScope {
+                launch {
+                    scale.animateTo(1.22f, animationSpec = tween(120, easing = FastOutSlowInEasing))
+                    scale.animateTo(1.0f, animationSpec = tween(180, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    glowAlpha.animateTo(0.85f, animationSpec = tween(100))
+                    glowAlpha.animateTo(0f, animationSpec = tween(350))
+                }
+            }
+        }
+        prevCoins = coins
     }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .testTag("coin_balance_badge")
-            .scale(scale.value)
-            .shadow(4.dp, RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(Color(0xFFFFD54F), Color(0xFFFFB300))
-                ),
-                shape = RoundedCornerShape(20.dp)
-            )
-            .border(2.dp, Color(0xFFFFF9C4), RoundedCornerShape(20.dp))
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(26.dp)
-                .background(Color(0xFFFFF59D), CircleShape)
-                .border(1.5.dp, Color(0xFFF57F17), CircleShape)
-        ) {
-            Icon(
-                imageVector = Icons.Default.MonetizationOn,
-                contentDescription = "Koin Emas",
-                tint = Color(0xFFF57F17),
-                modifier = Modifier.size(18.dp)
+    Box(contentAlignment = Alignment.Center) {
+        // Glowing halo flash when coins land
+        if (glowAlpha.value > 0.05f) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .scale(1.2f)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(Color(0xFFFFEE58).copy(alpha = glowAlpha.value), Color.Transparent)
+                        ),
+                        RoundedCornerShape(22.dp)
+                    )
             )
         }
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = String.format("%,d", coins).replace(',', '.'),
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 15.sp,
-            color = Color(0xFF3E2723)
-        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = modifier
+                .testTag("persistent_wallet_display")
+                .testTag("coin_balance_badge")
+                .scale(scale.value)
+                .shadow(4.dp, RoundedCornerShape(20.dp))
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color(0xFFFFD54F), Color(0xFFFFB300))
+                    ),
+                    shape = RoundedCornerShape(20.dp)
+                )
+                .border(
+                    width = if (glowAlpha.value > 0.05f) 2.5.dp else 1.8.dp,
+                    color = if (glowAlpha.value > 0.05f) Color(0xFFFFFDE7) else Color(0xFFFFF9C4),
+                    shape = RoundedCornerShape(20.dp)
+                )
+                .padding(horizontal = 11.dp, vertical = 5.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(26.dp)
+                    .background(Color(0xFFFFF59D), CircleShape)
+                    .border(1.5.dp, Color(0xFFF57F17), CircleShape)
+            ) {
+                Icon(
+                    imageVector = if (showWalletIcon) Icons.Default.MonetizationOn else Icons.Default.AccountBalanceWallet,
+                    contentDescription = "Dompet Koin",
+                    tint = Color(0xFFF57F17),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = String.format("%,d", animatedCoins).replace(',', '.'),
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 14.sp,
+                color = Color(0xFF3E2723)
+            )
+        }
     }
 }
 
@@ -114,6 +166,7 @@ fun PlaySessionHeader(
     gameTitle: String,
     sessionSeconds: Int,
     sessionEarnedCoins: Int,
+    walletCoins: Int = 0,
     onCloseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -130,50 +183,64 @@ fun PlaySessionHeader(
             .fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Game title and play time
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
                     Text(
                         text = "🎮",
-                        fontSize = 22.sp,
+                        fontSize = 20.sp,
                         modifier = Modifier.padding(end = 6.dp)
                     )
                     Column {
                         Text(
                             text = gameTitle,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = TextPrimary
+                            fontSize = 14.sp,
+                            color = TextPrimary,
+                            maxLines = 1
                         )
                         Text(
-                            text = String.format("Waktu Main: %02d:%02d", mins, secs),
-                            fontSize = 12.sp,
+                            text = String.format("Waktu: %02d:%02d", mins, secs),
+                            fontSize = 11.sp,
                             color = OceanCyan,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Persistent Wallet Display and Controls
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    // Persistent wallet display at top of screen
+                    CoinBadge(coins = walletCoins)
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
                     // Session coins pill
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(Color(0xFFFFF9C4), RoundedCornerShape(12.dp))
                             .border(1.dp, SunGold, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 7.dp, vertical = 4.dp)
                     ) {
-                        Text(text = "🪙", fontSize = 12.sp)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "🪙", fontSize = 11.sp)
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "+$sessionEarnedCoins",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             color = Color(0xFFF57F17)
                         )
                     }
@@ -184,14 +251,14 @@ fun PlaySessionHeader(
                         onClick = onCloseClick,
                         modifier = Modifier
                             .testTag("close_game_button")
-                            .size(36.dp)
+                            .size(34.dp)
                             .background(CoralCandy.copy(alpha = 0.15f), CircleShape)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Keluar Game",
                             tint = CoralCandy,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }

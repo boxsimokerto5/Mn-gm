@@ -12,23 +12,22 @@ import kotlin.math.sin
  * Menghasilkan resonansi logam khas koin jatuh (dual-tone metallic ping).
  */
 object CoinSoundPlayer {
-    fun playCoinClink() {
+    fun playCoinClink(frequencyMultiplier: Double = 1.0) {
         try {
             Thread {
                 val sampleRate = 44100
-                val durationMs = 380
+                val durationMs = 340
                 val numSamples = (sampleRate * durationMs) / 1000
                 val buffer = ShortArray(numSamples)
 
                 // Frekuensi nada tinggi khas koin perunggu/emas bertabrakan
-                val f1 = 2489.0 // D#7 (denting utama)
-                val f2 = 3136.0 // G7 (harmonik logam)
-                val f3 = 4978.0 // D#8 (kilauan nada tinggi)
+                val f1 = 2489.0 * frequencyMultiplier // D#7 (denting utama)
+                val f2 = 3136.0 * frequencyMultiplier // G7 (harmonik logam)
+                val f3 = 4978.0 * frequencyMultiplier // D#8 (kilauan nada tinggi)
 
                 for (i in 0 until numSamples) {
                     val t = i.toDouble() / sampleRate
-                    // Peluruhan eksponensial cepat untuk resonansi khas logam
-                    val envelope = exp(-11.5 * t)
+                    val envelope = exp(-12.5 * t)
                     val sample = envelope * (
                         0.55 * sin(2.0 * Math.PI * f1 * t) +
                         0.30 * sin(2.0 * Math.PI * f2 * t) +
@@ -60,9 +59,26 @@ object CoinSoundPlayer {
                 audioTrack.write(buffer, 0, buffer.size)
                 audioTrack.play()
 
-                Thread.sleep(durationMs.toLong() + 30)
+                Thread.sleep(durationMs.toLong() + 20)
                 audioTrack.stop()
                 audioTrack.release()
+            }.start()
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Memainkan suara kerincing koin bertubi-tubi dengan variasi nada (cascade effect)
+     * saat serbuan koin masuk ke dalam dompet.
+     */
+    fun playCoinCascade(count: Int = 4, intervalMs: Long = 75L) {
+        try {
+            Thread {
+                val pitches = listOf(1.0, 1.08, 1.15, 1.22, 1.28)
+                for (i in 0 until count) {
+                    val pitch = pitches[i % pitches.size]
+                    playCoinClink(pitch)
+                    Thread.sleep(intervalMs)
+                }
             }.start()
         } catch (_: Exception) {}
     }
